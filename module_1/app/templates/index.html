@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set title = "Home" %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-left">
+    <h1 class="name">Moisés Junca Acebedo</h1>
+    <h2 class="position">Director / Principal Consultant – AI, Cloud & Data Transformation</h2>
+
+    <p class="bio">
+      Technology leader driving cloud, AI, and data transformation initiatives.
+      Experienced across data engineering, generative AI, and enterprise modernization,
+      bridging business strategy and execution to deliver measurable outcomes.
+    </p>
+
+    <p class="bio">
+      Background includes cloud architecture, data platforms, MLOps, and applied AI
+      across enterprise environments.
+    </p>
+  </div>
+
+  <div class="hero-right">
+    <img
+      class="profile-img"
+      src="{{ url_for('static', filename='img/profile.jpg') }}"
+      alt="Profile picture"
+    >
+  </div>
+</section>
+{% endblock %}

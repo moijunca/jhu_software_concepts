@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title if title else "Module 1" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Module 1</div>
+    <nav class="nav">
+      <a class="nav-link {{ 'active' if active_page=='home' else '' }}" href="{{ url_for('main.home') }}">Home</a>
+      <a class="nav-link {{ 'active' if active_page=='projects' else '' }}" href="{{ url_for('main.projects') }}">Projects</a>
+      <a class="nav-link {{ 'active' if active_page=='contact' else '' }}" href="{{ url_for('main.contact') }}">Contact</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

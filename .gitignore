@@ -1,0 +1,13 @@
+# Python virtual environments
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Zip artifacts (Canvas submissions)
+*.zip
+_MACOSX/
+# Local LLM models (do NOT commit)
+llm_hosting/models/
+*.gguf
