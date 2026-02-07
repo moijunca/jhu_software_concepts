@@ -33,9 +33,11 @@ and standard Python libraries.
 
 Key aspects of the approach:
 
-- robots.txt compliance:
-  Before scraping, the script explicitly checks the GradCafe robots.txt
-  file using urllib.robotparser to confirm that survey pages may be fetched.
+Robots.txt Verification:
+The GradCafe robots.txt file was manually reviewed in a browser prior to
+scraping. A screenshot of the robots.txt file confirming that User-agent "*"
+is allowed to access the site is included as:
+module_2/robots_txt_checked.png
 
 - Ethical scraping:
   Requests are rate-limited using randomized sleep intervals between
