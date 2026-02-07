@@ -44,18 +44,19 @@ def main():
             one(cur, "Q1 Fall 2026 applicants:",
                 "SELECT COUNT(*) FROM applicants WHERE term = %s;",
                 (FALL_2026,))
+            # Q2: What percent of applicants are International?
+            # (Calculated only among applicants who explicitly stated nationality)
+            one(cur, "Q2 Percent International (known nationality only):",
+    """
+    SELECT ROUND(
+        100.0 * SUM(CASE WHEN us_or_international ILIKE %s THEN 1 ELSE 0 END)
+        / NULLIF(SUM(CASE WHEN us_or_international IS NOT NULL AND us_or_international<>'' THEN 1 ELSE 0 END), 0),
+        2
+    )
+    FROM applicants;
+    """,
+    ("%international%",))
 
-            # Q2: Percent international (based on extracted us_or_international)
-            one(cur, "Q2 Percent International:",
-                """
-                SELECT ROUND(
-                    100.0 * SUM(CASE WHEN us_or_international ILIKE %s THEN 1 ELSE 0 END)
-                    / NULLIF(COUNT(*),0),
-                    2
-                )
-                FROM applicants;
-                """,
-                ("%international%",))
 
             # Q3: Average GPA and GRE among those who reported them
             one(cur, "Q3 Avg GPA (non-null):",
@@ -74,18 +75,32 @@ def main():
                 """,
                 (FALL_2026, "%american%"))
 
-            # Q5: Acceptance % in Fall 2026 (decision word Accepted)
-            one(cur, "Q5 Acceptance % (Fall 2026):",
-                """
-                SELECT ROUND(
-                    100.0 * SUM(CASE WHEN status ILIKE %s THEN 1 ELSE 0 END)
-                    / NULLIF(COUNT(*),0),
-                    2
-                )
-                FROM applicants
-                WHERE term = %s;
-                """,
-                (DECISION_ACCEPTED, FALL_2026))
+            # Q5: What percent of Fall 2026 applicants were accepted?
+            # (Only considering rows where a decision word exists so the denominator is meaningful)
+            one(cur, "Q5 Acceptance % (Fall 2026, decisions only):",
+            f"""
+            SELECT ROUND(
+            100.0 * SUM(CASE WHEN status ILIKE %s THEN 1 ELSE 0 END)
+            / NULLIF(
+            SUM(
+                CASE WHEN {DECISION_ANY_SQL} THEN 1 ELSE 0 END
+            ),
+            0
+        ),
+        2
+    )
+    FROM applicants
+    WHERE term = %s;
+    """,
+    (
+        DECISION_ACCEPTED,        # numerator: Accepted
+        DECISION_ACCEPTED,        # part of decision-any logic
+        DECISION_REJECTED,
+        DECISION_WAITLISTED,
+        DECISION_INTERVIEW,
+        FALL_2026                 # restrict to Fall 2026
+    )
+)
 
             # Q6: Avg GPA for Accepted in Fall 2026
             one(cur, "Q6 Avg GPA Accepted (Fall 2026):",
