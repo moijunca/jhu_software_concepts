@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GradCafe Analytics – Module 3</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; }
+        h1 { color: #2c3e50; }
+        .label { font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<h1>GradCafe Analytics Dashboard</h1>
+
+<div class="card">
+    <p><span class="label">Total Applicants:</span> {{ total }}</p>
+    <p><span class="label">Fall 2026 Applicants:</span> {{ fall2026 }}</p>
+    <p><span class="label">Percent International:</span> {{ international }}%</p>
+    <p><span class="label">Average GPA:</span> {{ avg_gpa }}</p>
+    <p><span class="label">Average GRE:</span> {{ avg_gre }}</p>
+    <p><span class="label">Avg GPA American (Fall 2026):</span> {{ avg_gpa_american }}</p>
+    <p><span class="label">Acceptance % (Fall 2026):</span> {{ acceptance }}%</p>
+    <p><span class="label">Avg GPA Accepted (Fall 2026):</span> {{ avg_gpa_accepted }}</p>
+</div>
+
+<h2>Term Distribution</h2>
+<div class="card">
+<ul>
+{% for term, count in terms %}
+    <li>{{ term }}: {{ count }}</li>
+{% endfor %}
+</ul>
+</div>
+
+<h2>Decision Distribution</h2>
+<div class="card">
+<ul>
+{% for decision, count in decisions %}
+    <li>{{ decision }}: {{ count }}</li>
+{% endfor %}
+</ul>
+</div>
+
+</body>
+</html>

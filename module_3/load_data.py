@@ -5,8 +5,6 @@ from datetime import datetime
 import psycopg2
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Use the JSONL file that actually has records
 DATA_FILE = os.path.join(BASE_DIR, "part1.json.jsonl")
 
 DB_NAME = os.getenv("PGDATABASE", "gradcafe")
@@ -14,34 +12,33 @@ DB_USER = os.getenv("PGUSER", os.getenv("USER"))
 DB_HOST = os.getenv("PGHOST", "localhost")
 DB_PORT = int(os.getenv("PGPORT", "5432"))
 
-# --- regex extractors (since term/GPA/GRE often appear inside free text) ---
-TERM_RE = re.compile(r"\b(Fall|Spring|Summer|Winter)\s*(20\d{2})\b", re.IGNORECASE)
+# -------------------------
+# Extractors (text often embeds these)
+# -------------------------
+
+# Term patterns:
+# 1) Full: "Fall 2026", "Spring 2026", "Fall '26", "Autumn 2026"
+TERM_FULL_RE = re.compile(r"\b(Fall|Spring|Summer|Winter|Autumn)\s*['’]?\s*(20\d{2}|\d{2})\b", re.IGNORECASE)
+
+# 2) Shorthand: "F26", "S26", "SU26", "W26", "F'26"
+TERM_SHORT_RE = re.compile(r"\b(F|S|SU|W)\s*['’]?\s*(\d{2})\b", re.IGNORECASE)
+
+TERM_MAP = {
+    "F": "Fall",
+    "S": "Spring",
+    "SU": "Summer",
+    "W": "Winter",
+}
+
 GPA_RE = re.compile(r"\bGPA\s*([0-4]\.\d{1,2})\b", re.IGNORECASE)
 GRE_RE = re.compile(r"\bGRE\s*(\d{3})\b", re.IGNORECASE)
+
+# Decisions: your data often says "Accepted on..." etc
 DECISION_RE = re.compile(r"\b(Accepted|Rejected|Waitlisted|Interview)\b", re.IGNORECASE)
+
+# Nationality markers
 AMERICAN_RE = re.compile(r"\bAmerican\b", re.IGNORECASE)
 INTL_RE = re.compile(r"\bInternational\b", re.IGNORECASE)
-
-
-TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS applicants (
-  p_id SERIAL PRIMARY KEY,
-  program TEXT,
-  comments TEXT,
-  date_added DATE,
-  url TEXT,
-  status TEXT,
-  term TEXT,
-  us_or_international TEXT,
-  gpa DOUBLE PRECISION,
-  gre DOUBLE PRECISION,
-  gre_v DOUBLE PRECISION,
-  gre_aw DOUBLE PRECISION,
-  degree TEXT,
-  llm_generated_program TEXT,
-  llm_generated_university TEXT
-);
-"""
 
 
 def parse_date(value):
@@ -50,7 +47,7 @@ def parse_date(value):
     s = str(value).strip()
     if not s:
         return None
-    for fmt in ("%B %d, %Y", "%Y-%m-%d", "%m/%d/%Y"):
+    for fmt in ("%B %d, %Y", "%b %d, %Y", "%Y-%m-%d", "%m/%d/%Y"):
         try:
             return datetime.strptime(s, fmt).date()
         except ValueError:
@@ -58,51 +55,83 @@ def parse_date(value):
     return None
 
 
-def to_float(value):
-    if value is None:
+def to_float(x):
+    if x is None:
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    s = str(value).strip()
+    if isinstance(x, (int, float)):
+        return float(x)
+    s = str(x).strip().replace(",", "")
     if not s:
         return None
-    s = s.replace(",", "")
     try:
         return float(s)
     except ValueError:
         return None
 
 
+def extract_term(text: str):
+    text = text or ""
+
+    # Full form first: "Fall 2026", "Fall '26", "Autumn 2026"
+    m = TERM_FULL_RE.search(text)
+    if m:
+        season = m.group(1).title()
+        year = m.group(2)
+
+        # Normalize 2-digit year -> 20xx
+        if len(year) == 2:
+            year = f"20{year}"
+
+        # Normalize Autumn -> Fall
+        if season == "Autumn":
+            season = "Fall"
+
+        return f"{season} {year}"
+
+    # Shorthand: "F26", "S26", "SU26", "W26"
+    m = TERM_SHORT_RE.search(text)
+    if m:
+        code = m.group(1).upper()
+        year2 = m.group(2)
+        season = TERM_MAP.get(code)
+        if season:
+            return f"{season} 20{year2}"
+
+    return None
+
+
 def extract_fields(text: str):
     text = text or ""
 
-    term = None
-    m = TERM_RE.search(text)
-    if m:
-        term = f"{m.group(1).title()} {m.group(2)}"
+    # term
+    term = extract_term(text)
 
+    # gpa
     gpa = None
     m = GPA_RE.search(text)
     if m:
         gpa = to_float(m.group(1))
 
+    # gre
     gre = None
     m = GRE_RE.search(text)
     if m:
         gre = to_float(m.group(1))
 
+    # status/decision
     status = None
     m = DECISION_RE.search(text)
     if m:
         status = m.group(1).title()
 
+    # us/international
     us_intl = None
     if INTL_RE.search(text):
         us_intl = "International"
     elif AMERICAN_RE.search(text):
         us_intl = "American"
 
-    return {"term": term, "gpa": gpa, "gre": gre, "status": status, "us_intl": us_intl}
+    return term, status, us_intl, gpa, gre
 
 
 def load_jsonl(path):
@@ -117,7 +146,7 @@ def load_jsonl(path):
 
 def main():
     if not os.path.exists(DATA_FILE):
-        raise FileNotFoundError(f"Missing data file: {DATA_FILE}")
+        raise FileNotFoundError(f"Missing {DATA_FILE}")
 
     records = load_jsonl(DATA_FILE)
 
@@ -138,17 +167,17 @@ def main():
 
     try:
         with conn.cursor() as cur:
-            cur.execute(TABLE_SQL)
+            # wipe old rows to ensure clean reload
             cur.execute("TRUNCATE applicants;")
 
             inserted = 0
             for r in records:
-                # Original fields from JSONL
                 program = (r.get("program") or "").strip() or None
                 comments = (r.get("comments") or "").strip() or None
                 date_added = parse_date(r.get("date_added"))
                 url = (r.get("url") or "").strip() or None
 
+                # raw fields (often empty or messy)
                 status_raw = (r.get("status") or "").strip() or None
                 term_raw = (r.get("term") or "").strip() or None
                 us_intl_raw = (r.get("US/International") or "").strip() or None
@@ -157,28 +186,36 @@ def main():
                 llm_prog = (r.get("llm-generated-program") or "").strip() or None
                 llm_uni = (r.get("llm-generated-university") or "").strip() or None
 
-                # Extract term/status/GPA/GRE/nationality from text (because many rows embed it)
                 combined = " ".join([
                     program or "",
                     comments or "",
                     status_raw or "",
                     term_raw or "",
+                    us_intl_raw or "",
+                    degree or "",
                 ])
-                ex = extract_fields(combined)
 
-                status = ex["status"] or status_raw
-                term = ex["term"] or term_raw
-                us_intl = ex["us_intl"] or us_intl_raw
-                gpa = ex["gpa"]
-                gre = ex["gre"]
+                term_ex, status_ex, us_intl_ex, gpa_ex, gre_ex = extract_fields(combined)
 
-                # gre_v / gre_aw not reliably available in your JSONL sample
-                gre_v = None
-                gre_aw = None
+                term = term_ex or term_raw
+                status = status_ex or status_raw
+                us_intl = us_intl_ex or us_intl_raw
 
                 cur.execute(insert_sql, (
-                    program, comments, date_added, url, status, term, us_intl,
-                    gpa, gre, gre_v, gre_aw, degree, llm_prog, llm_uni
+                    program,
+                    comments,
+                    date_added,
+                    url,
+                    status,
+                    term,
+                    us_intl,
+                    gpa_ex,
+                    gre_ex,
+                    None,   # gre_v not reliably present
+                    None,   # gre_aw not reliably present
+                    degree,
+                    llm_prog,
+                    llm_uni,
                 ))
                 inserted += 1
 
