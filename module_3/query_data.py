@@ -113,94 +113,139 @@ def fetch_metrics():
                   AND gpa IS NOT NULL;
             """, (FALL_2026,))
 
-            # Q7
+            # Q7: JHU Masters in Computer Science
             metrics["q7_jhu_ms_cs"] = one(cur, r"""
                 SELECT COUNT(*)
                 FROM applicants
                 WHERE
                 (
-                    program ILIKE '%%johns hopkins%%' OR program ILIKE '%%hopkins%%' OR program ILIKE '%%jhu%%'
-                    OR llm_generated_university ILIKE '%%johns hopkins%%' OR llm_generated_university ILIKE '%%hopkins%%' OR llm_generated_university ILIKE '%%jhu%%'
+                    program ILIKE '%%johns hopkins%%'
+                    OR program ILIKE '%%hopkins%%'
+                    OR program ILIKE '%%jhu%%'
+                    OR llm_generated_university ILIKE '%%johns hopkins%%'
+                    OR llm_generated_university ILIKE '%%hopkins%%'
+                    OR llm_generated_university ILIKE '%%jhu%%'
                 )
                 AND (
-                    program ILIKE '%%computer science%%' OR program ILIKE '%%comp sci%%'
-                    OR comments ILIKE '%%computer science%%' OR comments ILIKE '%%comp sci%%'
-                    OR llm_generated_program ILIKE '%%computer science%%' OR llm_generated_program ILIKE '%%comp sci%%'
-                    OR program ~* '\mCS\M' OR comments ~* '\mCS\M' OR llm_generated_program ~* '\mCS\M'
+                    (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
+                    OR (comments ILIKE '%%computer%%' AND comments ILIKE '%%science%%')
+                    OR (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
+                    OR program ~* '\mCS\M'
+                    OR comments ~* '\mCS\M'
+                    OR llm_generated_program ~* '\mCS\M'
                 )
                 AND (
-                    program ILIKE '%%master%%' OR comments ILIKE '%%master%%' OR status ILIKE '%%master%%'
-                    OR program ILIKE '%%msc%%' OR comments ILIKE '%%msc%%' OR status ILIKE '%%msc%%'
-                    OR program ILIKE '%%m.s%%' OR comments ILIKE '%%m.s%%' OR status ILIKE '%%m.s%%'
-                    OR program ILIKE '%%mscs%%' OR comments ILIKE '%%mscs%%' OR status ILIKE '%%mscs%%'
-                    OR program ILIKE '%%meng%%' OR comments ILIKE '%%meng%%' OR status ILIKE '%%meng%%'
-                    OR program ILIKE '%%mcs%%' OR comments ILIKE '%%mcs%%' OR status ILIKE '%%mcs%%'
+                    degree ILIKE 'Masters%%'
+                    OR program ILIKE '%%master%%'
+                    OR comments ILIKE '%%master%%'
+                    OR program ILIKE '%%m.s%%'
+                    OR program ILIKE '%%ms%%'
+                    OR program ILIKE '%%msc%%'
                 );
             """)
 
-            # Q8
+
+
+            # Q8: 2026 Acceptances for PhD CS at Georgetown / MIT / Stanford / CMU (raw fields)
             metrics["q8_raw"] = one(cur, r"""
                 SELECT COUNT(*)
                 FROM applicants
-                WHERE date_added >= DATE '2026-01-01'
-                AND date_added <  DATE '2027-01-01'
-                AND status ILIKE 'Accepted%%'
+                WHERE status ILIKE 'Accepted%%'
                 AND (
-                    program ILIKE '%%computer science%%' OR program ILIKE '%%comp sci%%'
-                    OR comments ILIKE '%%computer science%%' OR comments ILIKE '%%comp sci%%'
-                    OR program ~* '\mCS\M' OR comments ~* '\mCS\M'
+                    (date_added >= DATE '2026-01-01' AND date_added < DATE '2027-01-01')
+                    OR term ILIKE '%%2026%%'
                 )
                 AND (
-                    program ILIKE '%%phd%%' OR comments ILIKE '%%phd%%'
-                    OR program ILIKE '%%ph.d%%' OR comments ILIKE '%%ph.d%%'
-                    OR program ILIKE '%%doctorate%%' OR comments ILIKE '%%doctorate%%'
+                    (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
+                    OR (comments ILIKE '%%computer%%' AND comments ILIKE '%%science%%')
+                    OR program ~* '\mCS\M'
+                    OR comments ~* '\mCS\M'
+                )
+                AND (
+                    degree = 'PhD'
+                    OR program ILIKE '%%phd%%'
+                    OR comments ILIKE '%%phd%%'
+                    OR program ILIKE '%%ph.d%%'
+                    OR comments ILIKE '%%ph.d%%'
+                    OR program ILIKE '%%doctorate%%'
+                    OR comments ILIKE '%%doctorate%%'
                 )
                 AND (
                     program ILIKE '%%georgetown%%'
-                    OR program ILIKE '%%massachusetts institute of technology%%' OR program ILIKE '%%mit%%'
+                    OR program ILIKE '%%massachusetts institute of technology%%'
+                    OR program ILIKE '%%mit%%'
                     OR program ILIKE '%%stanford%%'
-                    OR program ILIKE '%%carnegie mellon%%' OR program ILIKE '%%cmu%%'
+                    OR program ILIKE '%%carnegie mellon%%'
+                    OR program ILIKE '%%cmu%%'
                 );
             """)
 
-            # Q9
+
+
+            # Q9: same as Q8 but using LLM-generated fields (fallback to raw)
             metrics["q9_llm"] = one(cur, r"""
                 SELECT COUNT(*)
                 FROM applicants
-                WHERE date_added >= DATE '2026-01-01'
-                AND date_added <  DATE '2027-01-01'
-                AND status ILIKE 'Accepted%%'
+                WHERE status ILIKE 'Accepted%%'
                 AND (
-                    llm_generated_program ILIKE '%%computer science%%' OR llm_generated_program ILIKE '%%comp sci%%'
-                    OR llm_generated_program ~* '\mCS\M'
-                    OR program ILIKE '%%computer science%%' OR comments ILIKE '%%computer science%%'
+                    (date_added >= DATE '2026-01-01' AND date_added < DATE '2027-01-01')
+                    OR term ILIKE '%%2026%%'
                 )
                 AND (
-                    program ILIKE '%%phd%%' OR comments ILIKE '%%phd%%'
-                    OR program ILIKE '%%ph.d%%' OR comments ILIKE '%%ph.d%%'
-                    OR program ILIKE '%%doctorate%%' OR comments ILIKE '%%doctorate%%'
+                    (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
+                    OR llm_generated_program ~* '\mCS\M'
+                    OR (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
+                    OR program ~* '\mCS\M'
+                )
+                AND (
+                    degree = 'PhD'
+                    OR program ILIKE '%%phd%%'
+                    OR comments ILIKE '%%phd%%'
+                    OR program ILIKE '%%ph.d%%'
+                    OR comments ILIKE '%%ph.d%%'
+                    OR program ILIKE '%%doctorate%%'
+                    OR comments ILIKE '%%doctorate%%'
                 )
                 AND (
                     llm_generated_university ILIKE '%%georgetown%%'
-                    OR llm_generated_university ILIKE '%%massachusetts institute of technology%%' OR llm_generated_university ILIKE '%%mit%%'
+                    OR llm_generated_university ILIKE '%%massachusetts institute of technology%%'
+                    OR llm_generated_university ILIKE '%%mit%%'
                     OR llm_generated_university ILIKE '%%stanford%%'
-                    OR llm_generated_university ILIKE '%%carnegie mellon%%' OR llm_generated_university ILIKE '%%cmu%%'
+                    OR llm_generated_university ILIKE '%%carnegie mellon%%'
+                    OR llm_generated_university ILIKE '%%cmu%%'
+                    OR program ILIKE '%%georgetown%%'
+                    OR program ILIKE '%%massachusetts institute of technology%%'
+                    OR program ILIKE '%%mit%%'
+                    OR program ILIKE '%%stanford%%'
+                    OR program ILIKE '%%carnegie mellon%%'
+                    OR program ILIKE '%%cmu%%'
                 );
             """)
 
-            # Q10a
-            cur.execute("""
+
+            # Q10a: Top 10 universities by Fall 2026 CS applicants (LLM university)
+            cur.execute(r"""
                 SELECT
-                  COALESCE(NULLIF(llm_generated_university, ''), 'Unknown') AS university,
-                  COUNT(*) AS cnt
+                COALESCE(NULLIF(llm_generated_university, ''), 'Unknown') AS university,
+                COUNT(*) AS cnt
                 FROM applicants
                 WHERE term = %s
-                  AND (program ILIKE '%%computer science%%' OR llm_generated_program ILIKE '%%computer science%%')
+                AND (
+                    (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
+                    OR (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
+                    OR program ~* '\mCS\M'
+                    OR llm_generated_program ~* '\mCS\M'
+                )
+                AND COALESCE(NULLIF(llm_generated_university,''), '') <> ''
+                AND llm_generated_university !~* 'gpa'
+                AND llm_generated_university !~* 'gre'
+                AND llm_generated_university !~* '^international\b'
                 GROUP BY 1
                 ORDER BY cnt DESC
                 LIMIT 10;
             """, (FALL_2026,))
             metrics["q10a_rows"] = cur.fetchall()
+
 
             # Q10b
             cur.execute("""
