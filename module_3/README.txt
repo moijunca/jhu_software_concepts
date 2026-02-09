@@ -1,152 +1,229 @@
 Name: Moises Junca  
 JHED ID: 33522  
 
-Module Info:  
-Module 3 – Databases, Querying, and Web Presentation  
 Course: Software Concepts  
-Due Date: (add official due date here)
+Module: 3 – Databases, Querying, and Web Presentation  
 
 ------------------------------------------------------------
-Overview
+OVERVIEW
 ------------------------------------------------------------
 
-This module builds on the data collected in Module 2 and focuses on:
+This module implements a complete analytics workflow using PostgreSQL and Python.  
+The focus of Module 3 is to:
 
-1) Loading structured applicant data into a PostgreSQL database  
-2) Performing analytical queries using SQL  
-3) Presenting results through both command-line scripts and a simple web interface  
+1. Load cleaned GradCafe applicant data into a relational database  
+2. Perform structured analytical queries using SQL  
+3. Present results through both:
+   - a command-line reporting script  
+   - a simple Flask-based web interface  
 
-The goal of Module 3 is to transform previously scraped and cleaned data into a reproducible analytics workflow backed by a relational database.
-
-------------------------------------------------------------
-Data Source
-------------------------------------------------------------
-
-The input to this module is a JSONL file (`part1.json.jsonl`) generated from earlier scraping and cleaning work. Each line in this file represents a single GradCafe applicant record containing fields such as:
-
-- program  
-- comments  
-- date_added  
-- status  
-- term  
-- GPA  
-- GRE  
-- nationality  
-
-Because the original GradCafe data is highly unstructured, most of these attributes must be extracted from free text using regular expressions.
+All components of Module 3 are designed to be self-contained and to run without requiring any code or data from Module 2.
 
 ------------------------------------------------------------
-Part 1: Database Loading (load_data.py)
+DATA SOURCE
 ------------------------------------------------------------
 
-The script `load_data.py` performs the following tasks:
+For this assignment, the source of truth is:
 
-- Connects to a local PostgreSQL database named “gradcafe”  
-- Truncates any existing applicant records to ensure a clean reload  
-- Reads records from `part1.json.jsonl`  
-- Extracts structured attributes from free text, including:  
-  - application term (e.g., “Fall 2026”, “F26”, “Fall ’26”)  
-  - GPA values  
-  - GRE scores  
-  - decision status (Accepted, Rejected, etc.)  
-  - nationality indicators (American / International)  
-- Inserts the processed records into the `applicants` table  
+module_3/data/llm_extend_applicant_data.json
 
-This script ensures that messy raw text is converted into structured fields that can be queried reliably in SQL.
+This file was provided by course staff (Liv d’Alberti) as a cleaned and structured dataset intended specifically for Module 3.
 
-------------------------------------------------------------
-Part 2: Querying the Database (query_data.py)
-------------------------------------------------------------
+It contains approximately 30,000 cleaned GradCafe applicant records in JSONL format, with fields such as:
 
-The script `query_data.py` answers the required assignment questions directly from PostgreSQL using parameterized SQL queries.
+- program
+- masters_or_phd
+- comments
+- date_added
+- llm_generated_program
+- llm_generated_university
 
-The script reports:
-
-Q1: Number of applicants for Fall 2026  
-Q2: Percent of applicants who are International  
-Q3: Average GPA and GRE among applicants who reported them  
-Q4: Average GPA for American applicants in Fall 2026  
-Q5: Acceptance percentage for Fall 2026 (based only on posts with a decision)  
-Q6: Average GPA of accepted applicants in Fall 2026  
-
-Additionally, two curiosity queries are implemented:
-
-- Distribution of application terms (including “No term detected”)  
-- Distribution of decision outcomes (Accepted, Rejected, Interview, etc.)
-
-These outputs are printed to the console in a reproducible format.
+Using this dataset ensures consistent and reliable results independent of individual Module 2 scraping performance.
 
 ------------------------------------------------------------
-Part 3: Web Interface (app.py)
+PROJECT STRUCTURE
 ------------------------------------------------------------
 
-A minimal Flask web application is provided in `app.py` which:
+The following files make up the complete Module 3 submission:
+
+module_3/
+│── app.py                    # Flask web application
+│── load_data.py              # Loads data into PostgreSQL
+│── query_data.py             # Runs SQL analytics queries
+│── requirements.txt          # Python dependencies
+│── README.txt                # This file
+│── screenshots/              # Required screenshots
+│── data/
+│    └── llm_extend_applicant_data.json   # Liv’s cleaned dataset (JSONL)
+│── templates/
+│    └── index.html           # Web UI template
+│── static/
+│    └── styles.css           # Styling for web interface
+
+------------------------------------------------------------
+PART 1: DATABASE LOADING (load_data.py)
+------------------------------------------------------------
+
+The script load_data.py performs the following steps:
+
+- Connects to a PostgreSQL database named "gradcafe"
+- Ensures a unique index on the applicants table for idempotent loads  
+- Reads all records from:
+
+module_3/data/llm_extend_applicant_data.json
+
+- Cleans and normalizes important fields such as:
+
+  - application term (e.g., “Fall 2026”)  
+  - decision status  
+  - degree level (Masters / PhD)  
+  - nationality indicators  
+  - program and university names  
+
+- Inserts all records into the applicants table using:
+
+ON CONFLICT DO NOTHING
+
+so that the script can be safely re-run multiple times.
+
+This script makes Module 3 fully independent of Module 2.
+
+------------------------------------------------------------
+PART 2: QUERYING THE DATABASE (query_data.py)
+------------------------------------------------------------
+
+The script query_data.py answers all required assignment questions directly from PostgreSQL using SQL queries.
+
+It reports:
+
+Required Questions
+
+Q0: Total number of applicants  
+Q1: Number of Fall 2026 applicants  
+Q2: Percent International applicants  
+Q3: Average GPA and GRE metrics  
+Q4: Average GPA for American students in Fall 2026  
+Q5: Acceptance percentage for Fall 2026  
+Q6: Average GPA of accepted Fall 2026 applicants  
+Q7: JHU Masters in Computer Science applicants  
+Q8: 2026 PhD CS acceptances at Georgetown / MIT / Stanford / CMU (raw fields)  
+Q9: Same as Q8 using LLM-generated fields  
+
+Additional Curiosity Queries
+
+Q10a: Top 10 universities by Fall 2026 Computer Science applicants  
+Q10b: Acceptance rate by application term  
+
+All results are printed in a reproducible, assignment-compliant format.
+
+------------------------------------------------------------
+PART 3: WEB INTERFACE (app.py)
+------------------------------------------------------------
+
+A minimal Flask application is included that:
 
 - Connects to the same PostgreSQL database  
-- Executes the same queries used in `query_data.py`  
-- Displays the results in a simple HTML webpage  
+- Executes the same queries as query_data.py  
+- Displays the results in a clean HTML dashboard  
 
-This satisfies the assignment requirement to present query results through a local web interface.
+This satisfies the assignment requirement for presenting analytics through a local web interface.
 
-------------------------------------------------------------
-Known Bugs / Limitations
-------------------------------------------------------------
+To run the web interface:
 
-Selection Bias  
-The scraper used to generate the source data relied on the parameter `sort=newest`.  
-As a result, the dataset is intentionally biased toward the most recent GradCafe posts.  
-This leads to an over-representation of the current admissions cycle (primarily “Fall 2026”) and an under-representation of older terms.
+python module_3/app.py
 
-This bias affects analyses such as:
+Then open in a browser:
 
-- “Top terms” distributions  
-- Acceptance rates by term  
-- Overall nationality percentages  
-
-These results should therefore be interpreted as descriptive of recent posts rather than as representative of all historical GradCafe data.
-
-Missing or Inconsistent Fields  
-Many GradCafe posts do not include structured information such as GPA, GRE, or nationality.  
-Although `load_data.py` attempts to extract these values using regular expressions, a significant portion of records still lack detectable values.
-
-For example, in the current dataset:
-
-- Total rows: 1,325  
-- Rows with detected term: 525  
-- Rows with GPA: 294  
-- Rows with GRE: 42  
-
-Averages and percentages are therefore calculated only from the subset of records where the relevant information could be extracted.
-
-Extraction Accuracy  
-Term detection relies on patterns such as “Fall 2026”, “F26”, or “Fall ’26”.  
-Unusual formats or misspellings may still fail to be recognized.
+http://127.0.0.1:8000
 
 ------------------------------------------------------------
-Files Included (Module 3)
+SCREENSHOTS
 ------------------------------------------------------------
 
-- load_data.py – loads JSONL data into PostgreSQL  
-- query_data.py – performs SQL analysis  
-- app.py – Flask web interface  
-- part1.json.jsonl – cleaned input dataset  
-- requirements.txt – Python dependencies  
-- README.txt – this document  
-- limitations.pdf – summary of limitations (submitted separately)  
+The submission includes screenshots demonstrating:
+
+- Successful execution of:
+  - load_data.py
+  - query_data.py
+  - the running Flask web application  
+- Console outputs showing correct query results  
+- Browser view of the analytics dashboard  
+
+These are located in:
+
+module_3/screenshots/
 
 ------------------------------------------------------------
-Reproducibility
+KNOWN LIMITATIONS
 ------------------------------------------------------------
 
-The full Module 3 workflow can be reproduced as follows:
+1. SOURCE DATA LIMITATIONS
 
-1) Create a Python virtual environment  
-2) Install dependencies using requirements.txt  
-3) Ensure PostgreSQL is running with a database named “gradcafe”  
-4) Execute:  
-      python load_data.py  
-      python query_data.py  
-5) Run the web application:  
-      python app.py  
+All results depend on the quality of Liv’s provided dataset.
 
-No external APIs or paid services are required.
+- GPA and GRE values are largely absent from the provided data  
+- Many records do not contain structured numeric fields  
+- As a result, averages for GPA/GRE may display as None or zero  
+
+This is an inherent limitation of the dataset, not of the SQL queries.
+
+2. TERM AND STATUS EXTRACTION
+
+Application term and decision status are derived from text fields using pattern matching.
+
+Unusual formatting in source posts may cause:
+
+- Some terms to be labeled as “No term detected”  
+- Some statuses to remain unclassified  
+
+3. SELECTION BIAS
+
+GradCafe data represents self-reported posts rather than an official admissions dataset.
+
+Therefore:
+
+- The dataset is not statistically representative  
+- Results should be interpreted as descriptive rather than authoritative  
+
+------------------------------------------------------------
+REPRODUCIBILITY
+------------------------------------------------------------
+
+To reproduce the full Module 3 workflow:
+
+1) Create a virtual environment
+
+python -m venv .venv
+source .venv/bin/activate
+
+2) Install dependencies
+
+pip install -r requirements.txt
+
+3) Ensure PostgreSQL is running
+
+Database must be named:
+
+gradcafe
+
+4) Load data
+
+python module_3/load_data.py
+
+5) Run queries
+
+python module_3/query_data.py
+
+6) Launch web interface
+
+python module_3/app.py
+
+------------------------------------------------------------
+FINAL NOTES
+------------------------------------------------------------
+
+- Module 3 does not rely on any Module 2 code or data  
+- All functionality is fully self-contained  
+- All requirements from the assignment specification have been implemented  
+
+End of README
