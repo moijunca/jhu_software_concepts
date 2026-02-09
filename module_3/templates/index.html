@@ -1,46 +1,359 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>GradCafe Analytics – Module 3</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; }
-        h1 { color: #2c3e50; }
-        .label { font-weight: bold; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GradCafe Analytics | Module 3</title>
+
+  <style>
+    :root {
+      --border: #d0d0d0;
+      --text: #111;
+      --muted: #555;
+      --bg: #fafafa;
+      --card: #fff;
+      --btn: #f5f5f5;
+      --btn-border: #333;
+
+      --info-bg: #e8f2ff;
+      --info-bd: #9cc3ff;
+
+      --success-bg: #e9f8ee;
+      --success-bd: #89d49e;
+
+      --warning-bg: #fff5e6;
+      --warning-bd: #ffc36b;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 28px;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    h1 { margin: 0 0 6px; }
+    h2 { margin: 0 0 12px; }
+
+    .muted { color: var(--muted); }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 340px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin: 14px 0;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+    }
+
+    .btn {
+      padding: 10px 12px;
+      border: 1px solid var(--btn-border);
+      background: var(--btn);
+      cursor: pointer;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input[type="number"] {
+      width: 130px;
+      padding: 8px;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .flash-wrap { margin: 12px 0; }
+    .flash {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+    .flash.info { background: var(--info-bg); border-color: var(--info-bd); }
+    .flash.success { background: var(--success-bg); border-color: var(--success-bd); }
+    .flash.warning { background: var(--warning-bg); border-color: var(--warning-bd); }
+
+    .qgrid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .qitem {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .qtitle {
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .qdesc {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 0.95em;
+    }
+
+    .qanswer {
+      font-size: 1.15em;
+      font-weight: 800;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { background: #f2f2f2; }
+
+    code {
+      background: #f2f2f2;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+  </style>
 </head>
+
 <body>
+  <div class="container">
 
-<h1>GradCafe Analytics Dashboard</h1>
+    <div class="topbar">
+      <div>
+        <h1>GradCafe Analytics Dashboard</h1>
+        <div class="muted">
+          This page shows answers to Module 3 questions computed from your PostgreSQL <code>applicants</code> table.
+        </div>
+      </div>
 
-<div class="card">
-    <p><span class="label">Total Applicants:</span> {{ total }}</p>
-    <p><span class="label">Fall 2026 Applicants:</span> {{ fall2026 }}</p>
-    <p><span class="label">Percent International:</span> {{ international }}%</p>
-    <p><span class="label">Average GPA:</span> {{ avg_gpa }}</p>
-    <p><span class="label">Average GRE:</span> {{ avg_gre }}</p>
-    <p><span class="label">Avg GPA American (Fall 2026):</span> {{ avg_gpa_american }}</p>
-    <p><span class="label">Acceptance % (Fall 2026):</span> {{ acceptance }}%</p>
-    <p><span class="label">Avg GPA Accepted (Fall 2026):</span> {{ avg_gpa_accepted }}</p>
-</div>
+      <div class="actions">
+        <!-- Update Analysis button (top right) -->
+        <form method="POST" action="{{ url_for('update_analysis') }}">
+          <button class="btn" type="submit" {% if pull_running %}disabled{% endif %}>
+            Update Analysis
+          </button>
+        </form>
 
-<h2>Term Distribution</h2>
-<div class="card">
-<ul>
-{% for term, count in terms %}
-    <li>{{ term }}: {{ count }}</li>
-{% endfor %}
-</ul>
-</div>
+        <div class="muted" style="text-align:right; max-width: 360px;">
+          Runs your database queries (query_data logic) and refreshes Q1–Q10 with the newest data currently stored in PostgreSQL.
+          {% if pull_running %}
+            <div style="margin-top:6px;"><b>Disabled:</b> Pull Data is currently running.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
 
-<h2>Decision Distribution</h2>
-<div class="card">
-<ul>
-{% for decision, count in decisions %}
-    <li>{{ decision }}: {{ count }}</li>
-{% endfor %}
-</ul>
-</div>
+    <!-- Flash messages -->
+    <div class="flash-wrap">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
 
+    <!-- Data Controls -->
+    <div class="card">
+      <h2>Data Controls</h2>
+
+      <form method="POST" action="{{ url_for('pull_data') }}">
+        <div class="row">
+          <label class="muted" for="max_records">Max rows to load:</label>
+          <input id="max_records" name="max_records" type="number" min="1" max="30000" value="500" />
+          <button class="btn" type="submit" {% if pull_running %}disabled{% endif %}>
+            Pull Data
+          </button>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">
+          <b>Pull Data</b> loads new rows from your Module 2 output files (clean dataset + LLM-extended dataset)
+          and inserts them into your PostgreSQL table (duplicates skipped).
+          {% if pull_running %}
+            <div style="margin-top:6px;">
+              <b>Status:</b> Loading data is currently running… executing <code>load_data.py</code>.
+            </div>
+          {% endif %}
+        </div>
+      </form>
+
+      <div class="muted" style="margin-top:10px;">
+        <b>Last load:</b> {{ pull_message }}
+      </div>
+    </div>
+
+    <!-- Required Questions Q1–Q9 -->
+    <div class="card">
+      <h2>Module 3 Required Questions (Q1–Q9)</h2>
+
+      <div class="qgrid">
+        <div class="qitem">
+          <div class="qtitle">Q1. How many entries are Fall 2026?</div>
+          <div class="qanswer">{{ metrics.fall_2026 }}</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q2. What percent are International (known nationality only)?</div>
+          <div class="qdesc">Computed over rows where <code>us_or_international</code> is populated (International vs American/Other).</div>
+          <div class="qanswer">{{ metrics.pct_intl }}%</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q3. Average GPA / GRE Q / GRE V / GRE AW (non-null only)</div>
+          <div class="qdesc">Averages computed only over rows that provide each metric.</div>
+          <table>
+            <tr><th>Metric</th><th>Average</th></tr>
+            <tr><td>GPA</td><td>{{ metrics.avg_gpa }}</td></tr>
+            <tr><td>GRE Quant</td><td>{{ metrics.avg_gre }}</td></tr>
+            <tr><td>GRE Verbal</td><td>{{ metrics.avg_gre_v }}</td></tr>
+            <tr><td>GRE AW</td><td>{{ metrics.avg_gre_aw }}</td></tr>
+          </table>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q4. Avg GPA of American students in Fall 2026</div>
+          <div class="qanswer">{{ metrics.avg_gpa_american_fall }}</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q5. What percent of Fall 2026 decisions are Acceptances?</div>
+          <div class="qdesc">Acceptance % computed among decisions only (Accepted/Rejected/Waitlisted/Interview).</div>
+          <div class="qanswer">{{ metrics.acceptance_pct }}%</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q6. Avg GPA of Fall 2026 Accepted applicants</div>
+          <div class="qanswer">{{ metrics.avg_gpa_accepted }}</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q7. How many applicants applied to JHU for a Masters in Computer Science?</div>
+          <div class="qdesc">This should be computed using your DB fields (raw and/or LLM fields depending on your query_data logic).</div>
+          <div class="qanswer">{{ metrics.q7 }}</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q8. 2026 Acceptances for PhD CS at Georgetown / MIT / Stanford / CMU (raw fields)</div>
+          <div class="qanswer">{{ metrics.q8 }}</div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q9. Does Q8 change if you use LLM Generated Fields?</div>
+          <div class="qdesc">This is the same filter as Q8, but using LLM normalized university/program fields.</div>
+          <div class="qanswer">{{ metrics.q9 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Q10: Your two curiosity questions -->
+    <div class="card">
+      <h2>Q10. Two Additional Curiosity Questions</h2>
+
+      <div class="qitem" style="margin-bottom: 12px;">
+        <div class="qtitle">Q10a. {{ metrics.q10a_title }}</div>
+        {% if metrics.q10a_rows %}
+          <table>
+            <tr><th>Result</th><th>Count</th></tr>
+            {% for label, cnt in metrics.q10a_rows %}
+              <tr><td>{{ label }}</td><td>{{ cnt }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div class="muted">No results available.</div>
+        {% endif %}
+      </div>
+
+      <div class="qitem">
+        <div class="qtitle">Q10b. {{ metrics.q10b_title }}</div>
+        {% if metrics.q10b_rows %}
+          <table>
+            <tr><th>Group</th><th>Rows</th></tr>
+            {% for uni, cnt in metrics.q10b_rows %}
+              <tr>
+                <td>{{ uni }}</td>
+                <td>{{ cnt }}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div class="muted">No results available.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Optional: distributions -->
+    <div class="card">
+      <h2>Term Distribution (Top 10)</h2>
+      {% if metrics.term_dist %}
+        <ul>
+          {% for term, count in metrics.term_dist %}
+            <li>{{ term }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No term distribution available.</div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Decision Distribution</h2>
+      {% if metrics.decision_dist %}
+        <ul>
+          {% for decision, count in metrics.decision_dist %}
+            <li>{{ decision }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No decision distribution available.</div>
+      {% endif %}
+    </div>
+
+  </div>
 </body>
 </html>
