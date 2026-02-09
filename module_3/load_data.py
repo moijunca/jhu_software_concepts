@@ -3,10 +3,9 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional
 
 import psycopg2
-
 
 # -------------------------
 # Module 3 self-contained data paths
@@ -14,12 +13,8 @@ import psycopg2
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-# Liv's file (JSONL)
+# Liv's file (JSONL) MUST be here
 LIV_LLM_JSONL = os.path.join(DATA_DIR, "llm_extend_applicant_data.json")
-
-# Optional structural file if you ever have it (not required for this loader)
-STRUCTURAL_JSON = os.path.join(DATA_DIR, "applicant_data_structural_clean.json")
-
 
 # -------------------------
 # DB config
@@ -29,27 +24,48 @@ DB_USER = os.getenv("PGUSER", os.getenv("USER"))
 DB_HOST = os.getenv("PGHOST", "localhost")
 DB_PORT = int(os.getenv("PGPORT", "5432"))
 
+FALL_2026 = "Fall 2026"
+
 
 # -------------------------
-# Helpers
+# DB helpers
 # -------------------------
 def get_conn():
     return psycopg2.connect(dbname=DB_NAME, user=DB_USER, host=DB_HOST, port=DB_PORT)
 
 
+# -------------------------
+# Cleaning / parsing helpers
+# -------------------------
 def clean_text(x: Any) -> Optional[str]:
     """Convert to str, strip, and REMOVE NUL bytes that crash psycopg2."""
     if x is None:
         return None
-    s = str(x)
-    s = s.replace("\x00", "")  # critical
+    s = str(x).replace("\x00", "")  # critical: remove NULs
     s = s.strip()
     return s if s else None
 
 
-def parse_date(value: Any) -> Optional[datetime.date]:
-    if not value:
+def to_float(x: Any) -> Optional[float]:
+    if x is None:
         return None
+    if isinstance(x, (int, float)):
+        return float(x)
+    s = clean_text(x)
+    if not s:
+        return None
+    s = s.replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def parse_date(value: Any) -> Optional[datetime.date]:
+    """
+    Liv's file often has: "January 31, 2026"
+    Also support: "Feb 1, 2026", "2026-02-01", "02/01/2026"
+    """
     s = clean_text(value)
     if not s:
         return None
@@ -61,7 +77,9 @@ def parse_date(value: Any) -> Optional[datetime.date]:
     return None
 
 
-# TERM extraction from any text we have
+# -------------------------
+# Term extraction
+# -------------------------
 TERM_FULL_RE = re.compile(r"\b(Fall|Spring|Summer|Winter|Autumn)\s*['’]?\s*(20\d{2}|\d{2})\b", re.IGNORECASE)
 TERM_SHORT_RE = re.compile(r"\b(F|S|SU|W)\s*['’]?\s*(\d{2})\b", re.IGNORECASE)
 TERM_MAP = {"F": "Fall", "S": "Spring", "SU": "Summer", "W": "Winter"}
@@ -91,36 +109,37 @@ def extract_term(text: str) -> Optional[str]:
     return None
 
 
+# -------------------------
+# Status / nationality
+# -------------------------
 DECISION_RE = re.compile(r"\b(Accepted|Rejected|Waitlisted|Wait listed|Interview)\b", re.IGNORECASE)
 AMERICAN_RE = re.compile(r"\bAmerican\b", re.IGNORECASE)
 INTL_RE = re.compile(r"\bInternational\b", re.IGNORECASE)
 
 
 def extract_status(text: str) -> Optional[str]:
-    if not text:
-        return None
-    m = DECISION_RE.search(text)
+    t = text or ""
+    m = DECISION_RE.search(t)
     if not m:
         return None
-    s = m.group(1).lower().replace(" ", "")
-    if s == "waitlisted" or s == "waitlisted":
+    raw = m.group(1).lower().replace(" ", "")
+    if raw == "waitlisted":
         return "Waitlisted"
-    if s == "waitlisted" or s == "waitlisted":
-        return "Waitlisted"
-    # normalize casing
     return m.group(1).title()
 
 
 def extract_us_intl(text: str) -> Optional[str]:
-    if not text:
-        return None
-    if INTL_RE.search(text):
+    t = text or ""
+    if INTL_RE.search(t):
         return "International"
-    if AMERICAN_RE.search(text):
+    if AMERICAN_RE.search(t):
         return "American"
     return None
 
 
+# -------------------------
+# Degree normalization
+# -------------------------
 def normalize_degree(x: Any) -> Optional[str]:
     s = clean_text(x)
     if not s:
@@ -135,6 +154,62 @@ def normalize_degree(x: Any) -> Optional[str]:
     return s
 
 
+# -------------------------
+# GPA / GRE extraction (fixes Q3–Q6)
+# -------------------------
+# GPA patterns:
+# - "GPA 3.88"
+# - "3.88 GPA"
+# - "3.88 Master's GPA"
+GPA_RE = re.compile(
+    r"\b(?:GPA\s*[:=]?\s*)?([0-4]\.\d{1,2})\s*(?:master'?s\s*)?(?:GPA)?\b",
+    re.IGNORECASE,
+)
+
+# GRE patterns: accept several forms
+GRE_Q_RE = re.compile(
+    r"\b(?:GRE\s*)?(?:Q(?:uant)?|Quant|Quantitative)\s*[:=]?\s*(\d{3})\b|\b(\d{3})\s*Q\b",
+    re.IGNORECASE,
+)
+GRE_V_RE = re.compile(
+    r"\b(?:GRE\s*)?(?:V(?:erb)?|Verbal)\s*[:=]?\s*(\d{3})\b|\b(\d{3})\s*V\b",
+    re.IGNORECASE,
+)
+GRE_AW_RE = re.compile(
+    r"\b(?:AWA|AW|Analytical Writing)\s*[:=]?\s*([0-6]\.\d)\b",
+    re.IGNORECASE,
+)
+
+
+def extract_gpa_gre(text: str):
+    t = text or ""
+
+    gpa = None
+    m = GPA_RE.search(t)
+    if m:
+        gpa = to_float(m.group(1))
+
+    gre_q = None
+    m = GRE_Q_RE.search(t)
+    if m:
+        gre_q = to_float(m.group(1) or m.group(2))
+
+    gre_v = None
+    m = GRE_V_RE.search(t)
+    if m:
+        gre_v = to_float(m.group(1) or m.group(2))
+
+    gre_aw = None
+    m = GRE_AW_RE.search(t)
+    if m:
+        gre_aw = to_float(m.group(1))
+
+    return gpa, gre_q, gre_v, gre_aw
+
+
+# -------------------------
+# JSONL loader
+# -------------------------
 def load_jsonl(path: str) -> Iterable[Dict[str, Any]]:
     """Stream JSONL (one object per line)."""
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -145,7 +220,6 @@ def load_jsonl(path: str) -> Iterable[Dict[str, Any]]:
             try:
                 yield json.loads(line)
             except Exception:
-                # skip malformed line
                 continue
 
 
@@ -211,7 +285,6 @@ def main():
     ON CONFLICT (url, program, comments) DO NOTHING;
     """
 
-    # We are using Liv as truth: insert directly, do NOT depend on module_2 structural.
     inserted = 0
     read_rows = 0
 
@@ -226,16 +299,31 @@ def main():
                 url = clean_text(r.get("url"))
                 date_added = parse_date(r.get("date_added") or r.get("date_added_raw"))
 
-                # Liv fields
+                # degree (Liv key: masters_or_phd)
                 deg = normalize_degree(r.get("masters_or_phd") or r.get("degree"))
+
+                # llm fields (support both key styles)
                 llm_prog = clean_text(r.get("llm-generated-program") or r.get("llm_generated_program"))
                 llm_uni = clean_text(r.get("llm-generated-university") or r.get("llm_generated_university"))
 
-                # derive term/status/us_intl from whatever text we have
-                combined = " ".join([program or "", comments or "", llm_prog or "", llm_uni or ""])
+                # status may exist in Liv file; otherwise derive from text
+                status = clean_text(r.get("status"))
+                combined = " ".join([program or "", comments or "", status or "", llm_prog or "", llm_uni or ""])
+
+                # term
                 term = extract_term(combined)
-                status = extract_status(clean_text(r.get("status")) or combined)
+
+                # IMPORTANT fallback: if no term but date_added is in 2026 -> Fall 2026
+                if term is None and date_added and date_added.year == 2026:
+                    term = FALL_2026
+
+                # derive status/us_intl if missing
+                if not status:
+                    status = extract_status(combined)
                 us_intl = extract_us_intl(combined)
+
+                # GPA/GRE extraction from combined text
+                gpa, gre_q, gre_v, gre_aw = extract_gpa_gre(combined)
 
                 cur.execute(
                     insert_sql,
@@ -247,10 +335,10 @@ def main():
                         status,
                         term,
                         us_intl,
-                        None,  # gpa (Liv file usually doesn't have it)
-                        None,  # gre q
-                        None,  # gre v
-                        None,  # gre aw
+                        gpa,
+                        gre_q,   # stored in column "gre" (Quant)
+                        gre_v,
+                        gre_aw,
                         deg,
                         llm_prog,
                         llm_uni,
@@ -268,13 +356,17 @@ def main():
         with conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM applicants;")
             total = cur.fetchone()[0]
+
             cur.execute("""
               SELECT
                 SUM(CASE WHEN llm_generated_university IS NOT NULL AND llm_generated_university<>'' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN llm_generated_program IS NOT NULL AND llm_generated_program<>'' THEN 1 ELSE 0 END)
+                SUM(CASE WHEN llm_generated_program IS NOT NULL AND llm_generated_program<>'' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN gpa IS NOT NULL THEN 1 ELSE 0 END),
+                SUM(CASE WHEN gre IS NOT NULL THEN 1 ELSE 0 END),
+                SUM(CASE WHEN term IS NOT NULL AND term<>'' THEN 1 ELSE 0 END)
               FROM applicants;
             """)
-            llm_uni_nonnull, llm_prog_nonnull = cur.fetchone()
+            llm_uni_nonnull, llm_prog_nonnull, gpa_cnt, greq_cnt, term_cnt = cur.fetchone()
     finally:
         conn.close()
 
@@ -284,6 +376,9 @@ def main():
     print(f"DB total: {total}")
     print(f"DB llm uni non-null: {llm_uni_nonnull}")
     print(f"DB llm prog non-null: {llm_prog_nonnull}")
+    print(f"DB GPA non-null: {gpa_cnt}")
+    print(f"DB GRE-Q (gre) non-null: {greq_cnt}")
+    print(f"DB term non-null: {term_cnt}")
 
 
 if __name__ == "__main__":
