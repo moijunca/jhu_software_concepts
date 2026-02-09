@@ -11,12 +11,7 @@ FALL_2026 = "Fall 2026"
 
 
 def get_conn():
-    return psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        host=DB_HOST,
-        port=DB_PORT,
-    )
+    return psycopg2.connect(dbname=DB_NAME, user=DB_USER, host=DB_HOST, port=DB_PORT)
 
 
 def one(cur, sql, params=None):
@@ -26,44 +21,32 @@ def one(cur, sql, params=None):
 
 
 def fetch_metrics():
-    """
-    Returns a dict used by Flask for rendering the dashboard.
-    Also usable for tests.
-    """
     metrics = {
-        "total": None,                 # Q0
-        "fall_2026": None,             # Q1
-        "pct_intl": None,              # Q2
-        "avg_gpa": None,               # Q3
-        "avg_gre": None,               # Q3
-        "avg_gre_v": None,             # Q3
-        "avg_gre_aw": None,            # Q3
-        "avg_gpa_american_fall": None, # Q4
-        "acceptance_pct": None,        # Q5
-        "avg_gpa_accepted": None,      # Q6
-        "q7_jhu_ms_cs": None,          # Q7
-        "q8_raw": None,                # Q8
-        "q9_llm": None,                # Q9
-        "q10a_rows": [],               # Q10a list of (label,count)
-        "q10b_rows": [],               # Q10b list of (term,term_cnt,acc_pct)
-        "term_dist": [],               # list of (term,count)
-        "decision_dist": [],           # list of (decision,count)
+        "total": None,
+        "fall_2026": None,
+        "pct_intl": None,
+        "avg_gpa": None,
+        "avg_gre": None,
+        "avg_gre_v": None,
+        "avg_gre_aw": None,
+        "avg_gpa_american_fall": None,
+        "acceptance_pct": None,
+        "avg_gpa_accepted": None,
+        "q7_jhu_ms_cs": None,
+        "q8_raw": None,
+        "q9_llm": None,
+        "q10a_rows": [],
+        "q10b_rows": [],
+        "term_dist": [],
+        "decision_dist": [],
     }
 
     conn = get_conn()
     try:
         with conn.cursor() as cur:
-            # Q0
             metrics["total"] = one(cur, "SELECT COUNT(*) FROM applicants;")
+            metrics["fall_2026"] = one(cur, "SELECT COUNT(*) FROM applicants WHERE term = %s;", (FALL_2026,))
 
-            # Q1
-            metrics["fall_2026"] = one(
-                cur,
-                "SELECT COUNT(*) FROM applicants WHERE term = %s;",
-                (FALL_2026,),
-            )
-
-            # Q2
             metrics["pct_intl"] = one(cur, """
                 SELECT ROUND(
                     100.0 * SUM(CASE WHEN us_or_international ILIKE 'International%%' THEN 1 ELSE 0 END)
@@ -73,13 +56,11 @@ def fetch_metrics():
                 FROM applicants;
             """)
 
-            # Q3
             metrics["avg_gpa"] = one(cur, "SELECT ROUND(AVG(gpa)::numeric, 3) FROM applicants WHERE gpa IS NOT NULL;")
             metrics["avg_gre"] = one(cur, "SELECT ROUND(AVG(gre)::numeric, 3) FROM applicants WHERE gre IS NOT NULL;")
             metrics["avg_gre_v"] = one(cur, "SELECT ROUND(AVG(gre_v)::numeric, 3) FROM applicants WHERE gre_v IS NOT NULL;")
             metrics["avg_gre_aw"] = one(cur, "SELECT ROUND(AVG(gre_aw)::numeric, 3) FROM applicants WHERE gre_aw IS NOT NULL;")
 
-            # Q4
             metrics["avg_gpa_american_fall"] = one(cur, """
                 SELECT ROUND(AVG(gpa)::numeric, 3)
                 FROM applicants
@@ -88,7 +69,6 @@ def fetch_metrics():
                   AND gpa IS NOT NULL;
             """, (FALL_2026,))
 
-            # Q5
             metrics["acceptance_pct"] = one(cur, """
                 SELECT ROUND(
                     100.0 * SUM(CASE WHEN status ILIKE 'Accepted%%' THEN 1 ELSE 0 END)
@@ -104,7 +84,6 @@ def fetch_metrics():
                 WHERE term = %s;
             """, (FALL_2026,))
 
-            # Q6
             metrics["avg_gpa_accepted"] = one(cur, """
                 SELECT ROUND(AVG(gpa)::numeric, 3)
                 FROM applicants
@@ -113,100 +92,96 @@ def fetch_metrics():
                   AND gpa IS NOT NULL;
             """, (FALL_2026,))
 
+            # ---- Robust CS regex: avoid matching "gpa", etc. ----
+            CS_REGEX = r'(^|[^a-z])cs([^a-z]|$)'
+
             # Q7: JHU Masters in Computer Science
-            metrics["q7_jhu_ms_cs"] = one(cur, r"""
+            metrics["q7_jhu_ms_cs"] = one(cur, f"""
                 SELECT COUNT(*)
                 FROM applicants
                 WHERE
-                (
-                    program ILIKE '%%johns hopkins%%'
-                    OR program ILIKE '%%hopkins%%'
-                    OR program ILIKE '%%jhu%%'
-                    OR llm_generated_university ILIKE '%%johns hopkins%%'
-                    OR llm_generated_university ILIKE '%%hopkins%%'
-                    OR llm_generated_university ILIKE '%%jhu%%'
-                )
-                AND (
+                  (
+                    program ILIKE '%%johns hopkins%%' OR program ILIKE '%%hopkins%%' OR program ILIKE '%%jhu%%'
+                    OR llm_generated_university ILIKE '%%johns hopkins%%' OR llm_generated_university ILIKE '%%hopkins%%' OR llm_generated_university ILIKE '%%jhu%%'
+                  )
+                  AND (
                     (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
                     OR (comments ILIKE '%%computer%%' AND comments ILIKE '%%science%%')
                     OR (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
-                    OR program ~* '\mCS\M'
-                    OR comments ~* '\mCS\M'
-                    OR llm_generated_program ~* '\mCS\M'
-                )
-                AND (
-                    degree ILIKE 'Masters%%'
-                    OR program ILIKE '%%master%%'
-                    OR comments ILIKE '%%master%%'
-                    OR program ILIKE '%%m.s%%'
-                    OR program ILIKE '%%ms%%'
-                    OR program ILIKE '%%msc%%'
-                );
-            """)
+                    OR program ILIKE '%%comp sci%%'
+                    OR comments ILIKE '%%comp sci%%'
+                    OR llm_generated_program ILIKE '%%comp sci%%'
+                    OR program ~* %s
+                    OR comments ~* %s
+                    OR llm_generated_program ~* %s
+                  )
+                  AND (
+                    degree ILIKE 'Master%%'
+                    OR program ILIKE '%%master%%' OR comments ILIKE '%%master%%'
+                    OR program ILIKE '%%m.s%%' OR comments ILIKE '%%m.s%%'
+                    OR program ILIKE '%%msc%%' OR comments ILIKE '%%msc%%'
+                    OR program ILIKE '%%mcs%%' OR comments ILIKE '%%mcs%%'
+                    OR program ILIKE '%%meng%%' OR comments ILIKE '%%meng%%'
+                  );
+            """, (CS_REGEX, CS_REGEX, CS_REGEX))
 
-
-
-            # Q8: 2026 Acceptances for PhD CS at Georgetown / MIT / Stanford / CMU (raw fields)
-            metrics["q8_raw"] = one(cur, r"""
+            # Q8: 2026 acceptances PhD CS at Georgetown/MIT/Stanford/CMU (raw)
+            metrics["q8_raw"] = one(cur, f"""
                 SELECT COUNT(*)
                 FROM applicants
                 WHERE status ILIKE 'Accepted%%'
-                AND (
+                  AND (
                     (date_added >= DATE '2026-01-01' AND date_added < DATE '2027-01-01')
                     OR term ILIKE '%%2026%%'
-                )
-                AND (
+                  )
+                  AND (
                     (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
                     OR (comments ILIKE '%%computer%%' AND comments ILIKE '%%science%%')
-                    OR program ~* '\mCS\M'
-                    OR comments ~* '\mCS\M'
-                )
-                AND (
+                    OR program ILIKE '%%comp sci%%'
+                    OR comments ILIKE '%%comp sci%%'
+                    OR program ~* %s
+                    OR comments ~* %s
+                  )
+                  AND (
                     degree = 'PhD'
-                    OR program ILIKE '%%phd%%'
-                    OR comments ILIKE '%%phd%%'
-                    OR program ILIKE '%%ph.d%%'
-                    OR comments ILIKE '%%ph.d%%'
-                    OR program ILIKE '%%doctorate%%'
-                    OR comments ILIKE '%%doctorate%%'
-                )
-                AND (
+                    OR program ILIKE '%%phd%%' OR comments ILIKE '%%phd%%'
+                    OR program ILIKE '%%ph.d%%' OR comments ILIKE '%%ph.d%%'
+                    OR program ILIKE '%%doctorate%%' OR comments ILIKE '%%doctorate%%'
+                  )
+                  AND (
                     program ILIKE '%%georgetown%%'
                     OR program ILIKE '%%massachusetts institute of technology%%'
                     OR program ILIKE '%%mit%%'
                     OR program ILIKE '%%stanford%%'
                     OR program ILIKE '%%carnegie mellon%%'
                     OR program ILIKE '%%cmu%%'
-                );
-            """)
+                  );
+            """, (CS_REGEX, CS_REGEX))
 
-
-
-            # Q9: same as Q8 but using LLM-generated fields (fallback to raw)
-            metrics["q9_llm"] = one(cur, r"""
+            # Q9: same as Q8 but LLM fields for school/program (fallback to raw)
+            metrics["q9_llm"] = one(cur, f"""
                 SELECT COUNT(*)
                 FROM applicants
                 WHERE status ILIKE 'Accepted%%'
-                AND (
+                  AND (
                     (date_added >= DATE '2026-01-01' AND date_added < DATE '2027-01-01')
                     OR term ILIKE '%%2026%%'
-                )
-                AND (
+                  )
+                  AND (
                     (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
-                    OR llm_generated_program ~* '\mCS\M'
+                    OR llm_generated_program ILIKE '%%comp sci%%'
+                    OR llm_generated_program ~* %s
                     OR (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
-                    OR program ~* '\mCS\M'
-                )
-                AND (
+                    OR program ILIKE '%%comp sci%%'
+                    OR program ~* %s
+                  )
+                  AND (
                     degree = 'PhD'
-                    OR program ILIKE '%%phd%%'
-                    OR comments ILIKE '%%phd%%'
-                    OR program ILIKE '%%ph.d%%'
-                    OR comments ILIKE '%%ph.d%%'
-                    OR program ILIKE '%%doctorate%%'
-                    OR comments ILIKE '%%doctorate%%'
-                )
-                AND (
+                    OR program ILIKE '%%phd%%' OR comments ILIKE '%%phd%%'
+                    OR program ILIKE '%%ph.d%%' OR comments ILIKE '%%ph.d%%'
+                    OR program ILIKE '%%doctorate%%' OR comments ILIKE '%%doctorate%%'
+                  )
+                  AND (
                     llm_generated_university ILIKE '%%georgetown%%'
                     OR llm_generated_university ILIKE '%%massachusetts institute of technology%%'
                     OR llm_generated_university ILIKE '%%mit%%'
@@ -219,35 +194,34 @@ def fetch_metrics():
                     OR program ILIKE '%%stanford%%'
                     OR program ILIKE '%%carnegie mellon%%'
                     OR program ILIKE '%%cmu%%'
-                );
-            """)
+                  );
+            """, (CS_REGEX, CS_REGEX))
 
-
-            # Q10a: Top 10 universities by Fall 2026 CS applicants (LLM university)
-            cur.execute(r"""
+            # Q10a: Top 10 universities by Fall 2026 CS applicants (exclude obvious junk like "American Gpas")
+            cur.execute(f"""
                 SELECT
-                COALESCE(NULLIF(llm_generated_university, ''), 'Unknown') AS university,
-                COUNT(*) AS cnt
+                  COALESCE(NULLIF(llm_generated_university, ''), 'Unknown') AS university,
+                  COUNT(*) AS cnt
                 FROM applicants
                 WHERE term = %s
-                AND (
+                  AND (
                     (program ILIKE '%%computer%%' AND program ILIKE '%%science%%')
                     OR (llm_generated_program ILIKE '%%computer%%' AND llm_generated_program ILIKE '%%science%%')
-                    OR program ~* '\mCS\M'
-                    OR llm_generated_program ~* '\mCS\M'
-                )
-                AND COALESCE(NULLIF(llm_generated_university,''), '') <> ''
-                AND llm_generated_university !~* 'gpa'
-                AND llm_generated_university !~* 'gre'
-                AND llm_generated_university !~* '^international\b'
+                    OR program ILIKE '%%comp sci%%'
+                    OR llm_generated_program ILIKE '%%comp sci%%'
+                    OR program ~* %s
+                    OR llm_generated_program ~* %s
+                  )
+                  AND COALESCE(NULLIF(llm_generated_university,''), '') <> ''
+                  AND llm_generated_university !~* '(gpa|gre|score|american gpas)'
+                  AND llm_generated_university !~* '^international\\b'
                 GROUP BY 1
                 ORDER BY cnt DESC
                 LIMIT 10;
-            """, (FALL_2026,))
+            """, (FALL_2026, CS_REGEX, CS_REGEX))
             metrics["q10a_rows"] = cur.fetchall()
 
-
-            # Q10b
+            # Q10b (unchanged)
             cur.execute("""
                 WITH decisions AS (
                   SELECT
@@ -289,7 +263,7 @@ def fetch_metrics():
             """)
             metrics["q10b_rows"] = cur.fetchall()
 
-            # Term Distribution (Top 10)
+            # Term Distribution
             cur.execute("""
                 SELECT COALESCE(NULLIF(term,''), 'No term detected') AS term_label, COUNT(*) AS cnt
                 FROM applicants
@@ -334,7 +308,7 @@ def main():
     print(f"Q9 2026 Acceptances PhD CS (LLM fields): {m['q9_llm']}")
 
     print("\n=== Q10 Two additional curiosity questions ===")
-    print("\nQ10a Top 10 universities by Fall 2026 Computer Science applicants (LLM university):")
+    print("\nQ10a Top 10 universities by Fall 2026 CS applicants (LLM university):")
     for uni, cnt in m["q10a_rows"]:
         print(f"  {uni}: {cnt}")
 
