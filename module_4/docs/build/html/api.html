@@ -37,14 +37,151 @@
 <h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
 <p>This page is auto-generated from docstrings in the source modules using
 Sphinx autodoc.</p>
-<section id="app-module">
-<h2>app module<a class="headerlink" href="#app-module" title="Link to this heading">¶</a></h2>
+<section id="module-app">
+<span id="app-module"></span><h2>app module<a class="headerlink" href="#module-app" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="app.create_app">
+<span class="sig-prename descclassname"><span class="pre">app.</span></span><span class="sig-name descname"><span class="pre">create_app</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/app.html#create_app"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#app.create_app" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="app.fetch_metrics">
+<span class="sig-prename descclassname"><span class="pre">app.</span></span><span class="sig-name descname"><span class="pre">fetch_metrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/app.html#fetch_metrics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#app.fetch_metrics" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="app.get_conn">
+<span class="sig-prename descclassname"><span class="pre">app.</span></span><span class="sig-name descname"><span class="pre">get_conn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/app.html#get_conn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#app.get_conn" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </section>
-<section id="load-data-module">
-<h2>load_data module<a class="headerlink" href="#load-data-module" title="Link to this heading">¶</a></h2>
+<section id="module-load_data">
+<span id="load-data-module"></span><h2>load_data module<a class="headerlink" href="#module-load_data" title="Link to this heading">¶</a></h2>
+<p>load_data.py – ETL: parse JSONL from the LLM-extended dataset and insert rows
+into the PostgreSQL <code class="docutils literal notranslate"><span class="pre">applicants</span></code> table.</p>
+<p>Changes from Module 3:
+- Uses psycopg3 (<code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">psycopg</span></code>) instead of psycopg2.
+- <code class="docutils literal notranslate"><span class="pre">get_conn()</span></code> / <code class="docutils literal notranslate"><span class="pre">ensure_index()</span></code> / <code class="docutils literal notranslate"><span class="pre">main()</span></code> accept an optional Flask</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">app</span></code> object so that tests can inject a <code class="docutils literal notranslate"><span class="pre">DATABASE_URL</span></code> via
+<code class="docutils literal notranslate"><span class="pre">app.config</span></code> without touching environment variables.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">_build_conninfo()</span></code> mirrors the helper in <code class="docutils literal notranslate"><span class="pre">app.py</span></code>.</p></li>
+</ul>
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.clean_text">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">clean_text</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#clean_text"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.clean_text" title="Link to this definition">¶</a></dt>
+<dd><p>Convert to str, strip, and remove NUL bytes that crash psycopg.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.ensure_index">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">ensure_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/load_data.html#ensure_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.ensure_index" title="Link to this definition">¶</a></dt>
+<dd><p>Deduplicate existing rows and ensure the unique index exists.</p>
+<p>Used by <code class="docutils literal notranslate"><span class="pre">main()</span></code> before bulk-inserting to guarantee idempotency on
+tables that may have been populated without the index.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.ensure_table">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">ensure_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/load_data.html#ensure_table"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.ensure_table" title="Link to this definition">¶</a></dt>
+<dd><p>Create the <code class="docutils literal notranslate"><span class="pre">applicants</span></code> table and its unique index if they do not exist.</p>
+<p>Safe to call repeatedly (idempotent).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.extract_gpa_gre">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">extract_gpa_gre</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/load_data.html#extract_gpa_gre"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.extract_gpa_gre" title="Link to this definition">¶</a></dt>
+<dd><p>Extract GPA, GRE Quant, GRE Verbal, and GRE AW from free text.</p>
+<p>Returns a 4-tuple <code class="docutils literal notranslate"><span class="pre">(gpa,</span> <span class="pre">gre_q,</span> <span class="pre">gre_v,</span> <span class="pre">gre_aw)</span></code> where each element is
+a <code class="docutils literal notranslate"><span class="pre">float</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.extract_status">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">extract_status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#extract_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.extract_status" title="Link to this definition">¶</a></dt>
+<dd><p>Extract an admission decision string from free text.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.extract_term">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">extract_term</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#extract_term"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.extract_term" title="Link to this definition">¶</a></dt>
+<dd><p>Extract a normalised semester/year term string from free text.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.extract_us_intl">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">extract_us_intl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#extract_us_intl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.extract_us_intl" title="Link to this definition">¶</a></dt>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">'International'</span></code>, <code class="docutils literal notranslate"><span class="pre">'American'</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.get_conn">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">get_conn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/load_data.html#get_conn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.get_conn" title="Link to this definition">¶</a></dt>
+<dd><p>Open and return a psycopg3 connection.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.load_jsonl">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">load_jsonl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/load_data.html#load_jsonl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.load_jsonl" title="Link to this definition">¶</a></dt>
+<dd><p>Stream JSONL (one JSON object per line), skipping malformed lines.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.main">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jsonl_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/load_data.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.main" title="Link to this definition">¶</a></dt>
+<dd><p>Load records from the LLM-extended JSONL file into PostgreSQL.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>app</strong> – Optional Flask app whose <code class="docutils literal notranslate"><span class="pre">config[&quot;DATABASE_URL&quot;]</span></code> overrides the
+default connection string.</p></li>
+<li><p><strong>jsonl_path</strong> – Path to the JSONL file.  Defaults to <code class="docutils literal notranslate"><span class="pre">LIV_LLM_JSONL</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.normalize_degree">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">normalize_degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#normalize_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.normalize_degree" title="Link to this definition">¶</a></dt>
+<dd><p>Normalise a degree string to <code class="docutils literal notranslate"><span class="pre">'PhD'</span></code>, <code class="docutils literal notranslate"><span class="pre">'Masters'</span></code>, <code class="docutils literal notranslate"><span class="pre">'Bachelors'</span></code>, or raw.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.parse_date">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">parse_date</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">datetime</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#parse_date"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.parse_date" title="Link to this definition">¶</a></dt>
+<dd><p>Parse various date strings.</p>
+<p>Supported formats: <code class="docutils literal notranslate"><span class="pre">&quot;January</span> <span class="pre">31,</span> <span class="pre">2026&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;Feb</span> <span class="pre">1,</span> <span class="pre">2026&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;2026-02-01&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;02/01/2026&quot;</span></code>.
+Returns a <code class="xref py py-class docutils literal notranslate"><span class="pre">datetime.date</span></code> or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="load_data.to_float">
+<span class="sig-prename descclassname"><span class="pre">load_data.</span></span><span class="sig-name descname"><span class="pre">to_float</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="_modules/load_data.html#to_float"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#load_data.to_float" title="Link to this definition">¶</a></dt>
+<dd><p>Coerce a value to float, returning None on failure.</p>
+</dd></dl>
+
 </section>
-<section id="query-data-module">
-<h2>query_data module<a class="headerlink" href="#query-data-module" title="Link to this heading">¶</a></h2>
+<section id="module-query_data">
+<span id="query-data-module"></span><h2>query_data module<a class="headerlink" href="#module-query_data" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="query_data.fetch_metrics">
+<span class="sig-prename descclassname"><span class="pre">query_data.</span></span><span class="sig-name descname"><span class="pre">fetch_metrics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/query_data.html#fetch_metrics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#query_data.fetch_metrics" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="query_data.get_conn">
+<span class="sig-prename descclassname"><span class="pre">query_data.</span></span><span class="sig-name descname"><span class="pre">get_conn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/query_data.html#get_conn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#query_data.get_conn" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="query_data.main">
+<span class="sig-prename descclassname"><span class="pre">query_data.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/query_data.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#query_data.main" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </section>
 </section>
 
@@ -79,9 +216,9 @@ Sphinx autodoc.</p>
 <li class="toctree-l1"><a class="reference internal" href="overview.html">Overview &amp; Setup</a></li>
 <li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#app-module">app module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#load-data-module">load_data module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#query-data-module">query_data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-app">app module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-load_data">load_data module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-query_data">query_data module</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="testing.html">Testing Guide</a></li>
