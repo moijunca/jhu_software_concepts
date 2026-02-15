@@ -104,7 +104,7 @@ See `.github/workflows/tests.yml`.
 
 ## Documentation
 
-Sphinx documentation is published to Read the Docs.
+Sphinx documentation: https://jhu-gradcafe-module4.readthedocs.io
 
 To build locally:
 
