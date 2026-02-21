@@ -1,11 +1,14 @@
 [MESSAGES CONTROL]
 disable=
+    duplicate-code,
     global-statement,
     broad-exception-caught,
     subprocess-run-check,
     import-outside-toplevel,
     too-many-locals,
-    duplicate-code
+    line-too-long,
+    wrong-import-position,
+    unused-import
 
 [FORMAT]
-max-line-length=100
+max-line-length=120

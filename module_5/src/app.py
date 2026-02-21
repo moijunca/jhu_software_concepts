@@ -1,3 +1,4 @@
+"""Flask application for GradCafe Analytics (Module 5)."""
 import os
 import threading
 import subprocess
@@ -11,6 +12,7 @@ _LAST_ANALYSIS: str = ""
 FALL_2026 = "Fall 2026"
 
 def _build_conninfo(database_url=None):
+    """Return psycopg3-compatible connection string."""
     url = database_url or os.getenv("DATABASE_URL")
     if url:
         return url
@@ -21,10 +23,12 @@ def _build_conninfo(database_url=None):
     return f"dbname={db} user={user} host={host} port={port}"
 
 def get_conn(app=None):
+    """Open and return a psycopg3 connection."""
     return psycopg.connect(_build_conninfo(
         app.config.get("DATABASE_URL") if app else None))
 
 def fetch_metrics(app=None):
+    """Fetch analytics metrics from the database."""
     metrics = {
         "fall_2026": 0, "pct_intl": None, "avg_gpa": None, "avg_gre": None,
         "avg_gre_v": None, "avg_gre_aw": None, "avg_gpa_american_fall": None,
@@ -185,6 +189,7 @@ def _analysis_worker(app):
         _LAST_ANALYSIS = str(m)
 
 def create_app(config=None):
+    """Create and configure Flask application."""
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")
     this_dir = os.path.dirname(os.path.abspath(__file__))

@@ -1,3 +1,4 @@
+"""SQL query functions for GradCafe analytics."""
 import os
 from typing import Optional
 import psycopg
@@ -15,14 +16,15 @@ def _build_conninfo(app=None) -> str:
     return f"dbname={db} user={user} host={host} port={port}"
 
 def get_conn(app=None):
+    """Execute SQL query and return first column of first row."""
     return psycopg.connect(_build_conninfo(app))
 
 def _one(cur, sql, params=None):
     cur.execute(sql, params or ())
     row = cur.fetchone()
     return row[0] if row else None
-
 def fetch_metrics(app=None) -> dict:
+    """Fetch all analytics metrics from database."""
     metrics = {
         "total": None, "fall_2026": None, "pct_intl": None,
         "avg_gpa": None, "avg_gre": None, "avg_gre_v": None, "avg_gre_aw": None,
@@ -114,6 +116,7 @@ def fetch_metrics(app=None) -> dict:
     return metrics
 
 def main():
+    """CLI entry point for running queries."""
     m = fetch_metrics()
     print(f"Total: {m['total']}, Fall 2026: {m['fall_2026']}")
 
