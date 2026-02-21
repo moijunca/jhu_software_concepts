@@ -120,3 +120,40 @@ make html
 - **Web (Flask):** `src/app.py` — serves the analysis dashboard via `create_app()` factory. Routes return JSON (200/409) for testability.
 - **ETL:** `src/load_data.py` — parses LLM-extended JSONL, cleans/normalises fields, inserts into PostgreSQL with idempotency via `ON CONFLICT DO NOTHING`.
 - **DB/Queries:** `src/query_data.py` — executes Q1–Q10 analytical queries and returns results as a dictionary.
+
+## Fresh Install Instructions
+
+### Method 1: pip + venv (Traditional)
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+### Method 2: uv (Fast Alternative)
+```bash
+pip install uv
+uv venv
+source .venv/bin/activate
+uv pip sync requirements.txt
+pip install -e .
+```
+
+### Running the Application
+```bash
+export DB_NAME=gradcafe
+export DB_USER=gradcafe_user
+export DB_PASSWORD=your_password
+python src/app.py
+```
+
+### Running Tests
+```bash
+pytest tests/ --cov=src --cov-report=term-missing
+```
+
+### Running Pylint
+```bash
+pylint src/*.py
+```
