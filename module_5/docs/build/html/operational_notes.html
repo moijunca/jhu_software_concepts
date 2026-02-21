@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Operational Notes &#8212; GradCafe Analytics 4.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=3304f9e4"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Testing Guide" href="testing.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="operational-notes">
+<h1>Operational Notes<a class="headerlink" href="#operational-notes" title="Link to this heading">¶</a></h1>
+<section id="busy-state-policy">
+<h2>Busy-State Policy<a class="headerlink" href="#busy-state-policy" title="Link to this heading">¶</a></h2>
+<p>The application uses a module-level <code class="docutils literal notranslate"><span class="pre">_PULL_RUNNING</span></code> flag (protected by a
+<code class="docutils literal notranslate"><span class="pre">threading.Lock</span></code>) to prevent concurrent operations:</p>
+<ul class="simple">
+<li><p>While a pull is in progress, <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/pull-data</span></code> returns <strong>409</strong>
+<code class="docutils literal notranslate"><span class="pre">{&quot;busy&quot;:</span> <span class="pre">true}</span></code>.</p></li>
+<li><p>While a pull is in progress, <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/update-analysis</span></code> returns <strong>409</strong>
+<code class="docutils literal notranslate"><span class="pre">{&quot;busy&quot;:</span> <span class="pre">true}</span></code>.</p></li>
+<li><p>Once the pull completes (success or failure), <code class="docutils literal notranslate"><span class="pre">_PULL_RUNNING</span></code> is reset
+to <code class="docutils literal notranslate"><span class="pre">False</span></code> in the worker’s <code class="docutils literal notranslate"><span class="pre">finally</span></code> block — guaranteeing the flag
+always resets even if an exception occurs.</p></li>
+</ul>
+<p><strong>Important:</strong> Tests must never use <code class="docutils literal notranslate"><span class="pre">sleep()</span></code> to check busy state.
+Instead, inject the busy flag directly via <code class="docutils literal notranslate"><span class="pre">app_module._LOCK</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">app_module</span><span class="o">.</span><span class="n">_LOCK</span><span class="p">:</span>
+    <span class="n">app_module</span><span class="o">.</span><span class="n">_PULL_RUNNING</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/update-analysis&quot;</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">409</span>
+</pre></div>
+</div>
+</section>
+<section id="idempotency-strategy">
+<h2>Idempotency Strategy<a class="headerlink" href="#idempotency-strategy" title="Link to this heading">¶</a></h2>
+<p>The ETL layer is designed to be safe to run multiple times:</p>
+<ol class="arabic simple">
+<li><p>All inserts use <code class="docutils literal notranslate"><span class="pre">ON</span> <span class="pre">CONFLICT</span> <span class="pre">DO</span> <span class="pre">NOTHING</span></code> against the unique index.</p></li>
+<li><p>The unique index <code class="docutils literal notranslate"><span class="pre">applicants_sig_unique</span></code> is defined on
+<code class="docutils literal notranslate"><span class="pre">(COALESCE(url,''),</span> <span class="pre">COALESCE(program,''),</span> <span class="pre">COALESCE(comments,''))</span></code>.</p></li>
+<li><p>Running <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/pull-data</span></code> twice with the same data will not create
+duplicate rows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ensure_table()</span></code> / <code class="docutils literal notranslate"><span class="pre">ensure_index()</span></code> are idempotent — safe to call
+on every startup.</p></li>
+</ol>
+</section>
+<section id="uniqueness-keys">
+<h2>Uniqueness Keys<a class="headerlink" href="#uniqueness-keys" title="Link to this heading">¶</a></h2>
+<p>A row is considered a duplicate if it shares the same combination of:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">url</span></code> — source URL of the applicant record</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">program</span></code> — raw program/university string</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">comments</span></code> — applicant free-text comments</p></li>
+</ul>
+<p>This triple captures the semantic identity of a scraped record. Two records
+from the same URL with the same program and comments are always the same
+applicant entry, regardless of when they were scraped.</p>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
+<p><strong>Tests fail with</strong> <code class="docutils literal notranslate"><span class="pre">psycopg.OperationalError:</span> <span class="pre">connection</span> <span class="pre">refused</span></code></p>
+<p>The test database is not running. Start PostgreSQL and ensure
+<code class="docutils literal notranslate"><span class="pre">gradcafe_test</span></code> exists:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pg_ctl<span class="w"> </span>start
+createdb<span class="w"> </span>gradcafe_test
+</pre></div>
+</div>
+<p><strong>Tests fail with</strong> <code class="docutils literal notranslate"><span class="pre">relation</span> <span class="pre">&quot;applicants&quot;</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">exist</span></code></p>
+<p>The schema has not been initialised. The <code class="docutils literal notranslate"><span class="pre">app</span></code> fixture calls
+<code class="docutils literal notranslate"><span class="pre">ensure_table()</span></code> automatically — make sure you are using the <code class="docutils literal notranslate"><span class="pre">app</span></code>
+fixture in your test.</p>
+<p><strong>GitHub Actions workflow fails at “Install dependencies”</strong></p>
+<p>Check that <code class="docutils literal notranslate"><span class="pre">module_4/requirements.txt</span></code> contains <code class="docutils literal notranslate"><span class="pre">psycopg[binary]</span></code>
+(not <code class="docutils literal notranslate"><span class="pre">psycopg2</span></code>).</p>
+<p><strong>Coverage is below 100%</strong></p>
+<p>Run the coverage report locally to find uncovered lines:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pytest<span class="w"> </span>tests/<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;web or buttons or analysis or db or integration&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cov<span class="o">=</span>src<span class="w"> </span>--cov-report<span class="o">=</span>term-missing
+</pre></div>
+</div>
+<p>Then add additional tests to cover the missing lines.</p>
+<p><strong>Pull Data never completes in tests</strong></p>
+<p>Use a <code class="docutils literal notranslate"><span class="pre">threading.Event</span></code> to wait for the background worker:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">done</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fake_scraper</span><span class="p">():</span>
+    <span class="n">done</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">[]</span>
+
+<span class="n">client</span><span class="o">.</span><span class="n">application</span><span class="o">.</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;SCRAPER_FN&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fake_scraper</span>
+<span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/pull-data&quot;</span><span class="p">)</span>
+<span class="n">done</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">GradCafe Analytics</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview &amp; Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="testing.html">Testing Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Operational Notes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#busy-state-policy">Busy-State Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#idempotency-strategy">Idempotency Strategy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#uniqueness-keys">Uniqueness Keys</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="testing.html" title="previous chapter">Testing Guide</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, JHU Software Concepts.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.0.4</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/operational_notes.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

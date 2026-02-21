@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analysis | GradCafe Analytics</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="topbar">
+      <div>
+        <h1>GradCafe Analytics Dashboard</h1>
+        <div class="muted">
+          Module 4 — answers computed from the PostgreSQL <code>applicants</code> table.
+        </div>
+      </div>
+
+      <div class="actions">
+        <!-- Update Analysis button -->
+        <form method="POST" action="{{ url_for('update_analysis') }}">
+          <button
+            class="btn"
+            type="submit"
+            data-testid="update-analysis-btn"
+            {% if pull_running %}disabled{% endif %}>
+            Update Analysis
+          </button>
+        </form>
+
+        <div class="muted" style="text-align:right; max-width:360px;">
+          Refreshes Q1–Q10 from the data currently in PostgreSQL.
+          {% if pull_running %}
+            <div style="margin-top:6px;"><b>Disabled:</b> Pull Data is currently running.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Flash messages -->
+    <div class="flash-wrap">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Data Controls -->
+    <div class="card">
+      <h2>Data Controls</h2>
+
+      <form method="POST" action="{{ url_for('pull_data') }}">
+        <div class="row">
+          <label class="muted" for="max_records">Max rows to load:</label>
+          <input id="max_records" name="max_records" type="number" min="1" max="30000" value="500" />
+          <!-- Pull Data button -->
+          <button
+            class="btn"
+            type="submit"
+            data-testid="pull-data-btn"
+            {% if pull_running %}disabled{% endif %}>
+            Pull Data
+          </button>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">
+          <b>Pull Data</b> scrapes, cleans, and loads fresh rows into PostgreSQL
+          (duplicates are skipped automatically).
+          {% if pull_running %}
+            <div style="margin-top:6px;">
+              <b>Status:</b> Load in progress — running <code>load_data.py</code>…
+            </div>
+          {% endif %}
+        </div>
+      </form>
+
+      <div class="muted" style="margin-top:10px;">
+        <b>Last load:</b> {{ pull_message }}
+      </div>
+    </div>
+
+    <!-- Required Questions Q1–Q9 -->
+    <div class="card">
+      <h2>Module 4 Required Questions (Q1–Q9)</h2>
+
+      <div class="qgrid">
+
+        <div class="qitem">
+          <div class="qtitle">Q1. How many entries are Fall 2026?</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span> {{ metrics.fall_2026 }}
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q2. What percent are International (known nationality only)?</div>
+          <div class="qdesc">
+            Computed over rows where <code>us_or_international</code> is populated.
+          </div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span> {{ "%.2f"|format(metrics.pct_intl|float) }}%
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q3. Average GPA / GRE Q / GRE V / GRE AW (non-null only)</div>
+          <table>
+            <tr><th>Metric</th><th>Answer:</th></tr>
+            <tr><td>GPA</td>
+                <td>{{ "%.2f"|format(metrics.avg_gpa|float) if metrics.avg_gpa else 'N/A' }}</td></tr>
+            <tr><td>GRE Quant</td>
+                <td>{{ "%.2f"|format(metrics.avg_gre|float) if metrics.avg_gre else 'N/A' }}</td></tr>
+            <tr><td>GRE Verbal</td>
+                <td>{{ "%.2f"|format(metrics.avg_gre_v|float) if metrics.avg_gre_v else 'N/A' }}</td></tr>
+            <tr><td>GRE AW</td>
+                <td>{{ "%.2f"|format(metrics.avg_gre_aw|float) if metrics.avg_gre_aw else 'N/A' }}</td></tr>
+          </table>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q4. Avg GPA of American students in Fall 2026</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span>
+            {{ "%.2f"|format(metrics.avg_gpa_american_fall|float) if metrics.avg_gpa_american_fall else 'N/A' }}
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q5. What percent of Fall 2026 decisions are Acceptances?</div>
+          <div class="qdesc">
+            Acceptance % computed among decisions only (Accepted / Rejected / Waitlisted / Interview).
+          </div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span>
+            {{ "%.2f"|format(metrics.acceptance_pct|float) if metrics.acceptance_pct else 'N/A' }}%
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q6. Avg GPA of Fall 2026 Accepted applicants</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span>
+            {{ "%.2f"|format(metrics.avg_gpa_accepted|float) if metrics.avg_gpa_accepted else 'N/A' }}
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q7. How many applicants applied to JHU for a Masters in CS?</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span> {{ metrics.q7 }}
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q8. 2026 Acceptances PhD CS at Georgetown / MIT / Stanford / CMU (raw)</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span> {{ metrics.q8 }}
+          </div>
+        </div>
+
+        <div class="qitem">
+          <div class="qtitle">Q9. Does Q8 change if you use LLM Generated Fields?</div>
+          <div class="qanswer">
+            <span class="answer-label">Answer:</span> {{ metrics.q9 }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Q10: Curiosity questions -->
+    <div class="card">
+      <h2>Q10. Two Additional Curiosity Questions</h2>
+
+      <div class="qitem" style="margin-bottom:12px;">
+        <div class="qtitle">Q10a. {{ metrics.q10a_title }}</div>
+        {% if metrics.q10a_rows %}
+          <table>
+            <tr><th>Result</th><th>Answer:</th></tr>
+            {% for label, cnt in metrics.q10a_rows %}
+              <tr><td>{{ label }}</td><td>{{ cnt }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div class="muted">No results available.</div>
+        {% endif %}
+      </div>
+
+      <div class="qitem">
+        <div class="qtitle">Q10b. {{ metrics.q10b_title }}</div>
+        {% if metrics.q10b_rows %}
+          <table>
+            <tr><th>Group</th><th>Answer:</th></tr>
+            {% for uni, cnt in metrics.q10b_rows %}
+              <tr><td>{{ uni }}</td><td>{{ cnt }}</td></tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div class="muted">No results available.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Term Distribution -->
+    <div class="card">
+      <h2>Term Distribution (Top 10)</h2>
+      {% if metrics.term_dist %}
+        <ul>
+          {% for term, count in metrics.term_dist %}
+            <li>{{ term }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No term distribution available.</div>
+      {% endif %}
+    </div>
+
+    <!-- Decision Distribution -->
+    <div class="card">
+      <h2>Decision Distribution</h2>
+      {% if metrics.decision_dist %}
+        <ul>
+          {% for decision, count in metrics.decision_dist %}
+            <li>{{ decision }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No decision distribution available.</div>
+      {% endif %}
+    </div>
+
+  </div><!-- /.container -->
+</body>
+</html>

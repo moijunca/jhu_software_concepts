@@ -1,0 +1,12 @@
+# Web framework
+flask==3.0.3
+
+# PostgreSQL – psycopg3 (required by assignment; replaces psycopg2)
+psycopg[binary]==3.2.3
+
+# Testing
+pytest==8.3.3
+pytest-cov==5.0.0
+
+# HTML parsing for Flask page tests
+beautifulsoup4==4.12.3
