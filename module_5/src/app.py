@@ -4,6 +4,7 @@ import threading
 import subprocess
 import psycopg
 from flask import Flask, render_template, jsonify
+from psycopg import sql
 
 _LOCK = threading.Lock()
 _PULL_RUNNING: bool = False
@@ -51,9 +52,12 @@ def fetch_metrics(app=None):
                                               AND us_or_international <> '' THEN 1 ELSE 0 END), 0), 2)
                     FROM applicants;
                 """)
-                metrics["pct_intl"] = cur.fetchone()[0]
                 for col, key in [("gpa","avg_gpa"),("gre","avg_gre"),("gre_v","avg_gre_v"),("gre_aw","avg_gre_aw")]:
-                    cur.execute(f"SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL;")
+                    query = sql.SQL(
+                        "SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL"
+                    ).format(col=sql.Identifier(col))
+                    cur.execute(query)
+                    metrics[key] = cur.fetchone()[0]
                     metrics[key] = cur.fetchone()[0]
                 cur.execute("""
                     SELECT ROUND(AVG(gpa)::numeric, 3) FROM applicants

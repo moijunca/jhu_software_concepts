@@ -1,6 +1,7 @@
 """SQL query functions for GradCafe analytics."""
-import os
 from typing import Optional
+import os
+from psycopg import sql
 import psycopg
 
 FALL_2026 = "Fall 2026"
@@ -19,8 +20,8 @@ def get_conn(app=None):
     """Execute SQL query and return first column of first row."""
     return psycopg.connect(_build_conninfo(app))
 
-def _one(cur, sql, params=None):
-    cur.execute(sql, params or ())
+def _one(cur, query, params=None):
+    cur.execute(query, params or ())
     row = cur.fetchone()
     return row[0] if row else None
 def fetch_metrics(app=None) -> dict:
@@ -46,8 +47,10 @@ def fetch_metrics(app=None) -> dict:
                 FROM applicants;
             """)
             for col, key in [("gpa","avg_gpa"),("gre","avg_gre"),("gre_v","avg_gre_v"),("gre_aw","avg_gre_aw")]:
-                metrics[key] = _one(cur,
-                    f"SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL;")
+                query = sql.SQL(
+                    "SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL"
+                ).format(col=sql.Identifier(col))
+                metrics[key] = _one(cur, query)
             metrics["avg_gpa_american_fall"] = _one(cur, """
                 SELECT ROUND(AVG(gpa)::numeric, 3) FROM applicants
                 WHERE term = %s AND us_or_international ILIKE 'American%%' AND gpa IS NOT NULL;
