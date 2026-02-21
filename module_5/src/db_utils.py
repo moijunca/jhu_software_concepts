@@ -32,3 +32,23 @@ def get_conn(app=None):
         psycopg.Connection
     """
     return psycopg.connect(build_conninfo(app))
+
+
+def clamp_limit(limit, max_limit=100):
+    """Enforce maximum LIMIT value for queries.
+    
+    Args:
+        limit: Requested limit value
+        max_limit: Maximum allowed limit (default: 100)
+        
+    Returns:
+        Clamped limit value between 1 and max_limit
+    """
+    if limit is None:
+        return max_limit
+    try:
+        limit = int(limit)
+        return max(1, min(limit, max_limit))
+    except (ValueError, TypeError):
+        return max_limit
+    
