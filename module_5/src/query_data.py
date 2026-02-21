@@ -36,19 +36,19 @@ def fetch_metrics(app=None) -> dict:
     conn = get_conn(app)
     try:
         with conn.cursor() as cur:
-            metrics["total"] = _one(cur, "SELECT COUNT(*) FROM applicants;")
+            metrics["total"] = _one(cur, "SELECT COUNT(*) FROM applicants LIMIT 1;")
             metrics["fall_2026"] = _one(cur,
-                "SELECT COUNT(*) FROM applicants WHERE term = %s;", (FALL_2026,))
+                "SELECT COUNT(*) FROM applicants WHERE term = %s LIMIT 1;", (FALL_2026,))
             metrics["pct_intl"] = _one(cur, """
                 SELECT ROUND(
                     100.0 * SUM(CASE WHEN us_or_international ILIKE 'International%%' THEN 1 ELSE 0 END)
                     / NULLIF(SUM(CASE WHEN us_or_international IS NOT NULL
                                           AND us_or_international <> '' THEN 1 ELSE 0 END), 0), 2)
-                FROM applicants;
+                FROM applicants LIMIT 1;
             """)
             for col, key in [("gpa","avg_gpa"),("gre","avg_gre"),("gre_v","avg_gre_v"),("gre_aw","avg_gre_aw")]:
                 query = sql.SQL(
-                    "SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL"
+                    "SELECT ROUND(AVG({col})::numeric, 3) FROM applicants WHERE {col} IS NOT NULL LIMIT 1"
                 ).format(col=sql.Identifier(col))
                 metrics[key] = _one(cur, query)
             metrics["avg_gpa_american_fall"] = _one(cur, """
@@ -65,7 +65,7 @@ def fetch_metrics(app=None) -> dict:
             """, (FALL_2026,))
             metrics["avg_gpa_accepted"] = _one(cur, """
                 SELECT ROUND(AVG(gpa)::numeric, 3) FROM applicants
-                WHERE term = %s AND status ILIKE 'Accepted%%' AND gpa IS NOT NULL;
+                WHERE term = %s AND status ILIKE 'Accepted%%' AND gpa IS NOT NULL LIMIT 1;
             """, (FALL_2026,))
             metrics["q7_jhu_ms_cs"] = _one(cur, """
                 SELECT COUNT(*) FROM applicants

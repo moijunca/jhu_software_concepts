@@ -43,7 +43,7 @@ def fetch_metrics(app=None):
         conn = get_conn(app)
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM applicants WHERE term = %s;", (FALL_2026,))
+                cur.execute("SELECT COUNT(*) FROM applicants WHERE term = %s LIMIT 1;", (FALL_2026,))
                 metrics["fall_2026"] = cur.fetchone()[0] or 0
                 cur.execute("""
                     SELECT ROUND(
